@@ -1,0 +1,20 @@
+@startuml deployment
+
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Deployment.puml
+
+title BankOCR - Deployment Diagram
+
+Deployment_Node(machine, "Developer / User Machine", "Linux, macOS, or Windows") {
+    Deployment_Node(runtime, "Python Runtime", "Python >= 3.12") {
+        Container(app, "BankOCR CLI", "Python 3", "Reads ASCII input file, recognises digits, validates checksums, writes results file")
+    }
+    Deployment_Node(fs, "Local File System", "") {
+        Container(input, "Input File", "Plain-text", "ASCII account number entries, four lines per account")
+        Container(output, "Output File", "Plain-text", "One annotated result line per account number")
+    }
+}
+
+Rel(app, input, "Reads", "File I/O")
+Rel(app, output, "Writes", "File I/O")
+
+@enduml

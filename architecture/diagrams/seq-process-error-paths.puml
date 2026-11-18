@@ -1,0 +1,51 @@
+@startuml seq-process-error-paths
+
+title BankOCR - Runtime: ERR and ILL Error Paths
+
+actor User
+participant "Processor" as Processor
+participant "Parser" as Parser
+participant "Validator" as Validator
+
+User -> Processor : Provides input file (plain-text)
+activate Processor
+
+Processor -> Processor : Read and split file into four-line entries
+
+group ERR path: invalid checksum
+    Processor -> Parser : Pass four-line ASCII entry
+    activate Parser
+    Parser -> Parser : Map each 3x3 glyph to digit (0-9)
+    Parser --> Processor : Return nine-character account string (all digits recognised)
+    deactivate Parser
+
+    Processor -> Validator : Pass nine-character account string
+    activate Validator
+    Validator -> Validator : Apply mod-11 checksum
+    Validator --> Processor : Return ERR (checksum fails)
+    deactivate Validator
+
+    Processor -> Processor : Record result line with " ERR" annotation
+end
+
+group ILL path: unrecognised glyph
+    Processor -> Parser : Pass four-line ASCII entry
+    activate Parser
+    Parser -> Parser : Map each 3x3 glyph to digit (0-9)
+    Parser -> Parser : Glyph does not match any known pattern
+    Parser --> Processor : Return string with placeholder for unrecognised glyph
+    deactivate Parser
+
+    Processor -> Validator : Pass string containing placeholder
+    activate Validator
+    Validator -> Validator : Detect placeholder in account string
+    Validator --> Processor : Return ILL (illegible digit present)
+    deactivate Validator
+
+    Processor -> Processor : Record result line with " ILL" annotation
+end
+
+Processor -> User : Write results file (plain-text)
+deactivate Processor
+
+@enduml
