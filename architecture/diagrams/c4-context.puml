@@ -1,0 +1,13 @@
+@startuml c4-context
+
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
+
+title BankOCR - System Context Diagram
+
+Person(user, "User", "Provides ASCII account number files and receives validation results")
+
+System(bankocr, "BankOCR System", "Reads ASCII account numbers, recognizes digits, validates checksums, and generates results")
+
+Rel(user, bankocr, "Submits account files and receives results")
+
+@enduml
