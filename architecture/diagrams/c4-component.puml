@@ -1,0 +1,22 @@
+@startuml c4-component
+
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title BankOCR - Component Diagram
+
+Person(user, "User", "Provides ASCII account number files and receives validation results")
+
+Container_Boundary(app, "BankOCR CLI") {
+    Component(processor, "Processor", "Python", "Reads the input file, coordinates Parser and Validator, and writes the results file")
+    Component(parser, "Parser", "Python", "Receives a four-line ASCII account entry and converts each 3x3 glyph into a digit character")
+    Component(validator, "Validator", "Python", "Receives a nine-character account string and returns VALID, ERR, or ILL based on the mod-11 checksum")
+}
+
+Rel(user, processor, "Provides input file", "Plain-text file")
+Rel(processor, user, "Writes results file", "Plain-text file")
+Rel(processor, parser, "Passes four-line entry", "Account entry")
+Rel(processor, validator, "Passes nine-character string", "Account string")
+Rel_Back(processor, parser, "Returns nine-character account string")
+Rel_Back(processor, validator, "Returns VALID, ERR, or ILL")
+
+@enduml

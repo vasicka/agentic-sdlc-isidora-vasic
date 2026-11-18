@@ -1,0 +1,16 @@
+@startuml c4-container
+
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+title BankOCR - Container Diagram
+
+Person(user, "User", "Provides ASCII account number files and receives validation results")
+
+System_Boundary(bankocr, "BankOCR System") {
+    Container(app, "BankOCR CLI", "Python 3", "Reads an ASCII input file, recognises digits, validates checksums, and writes a results file")
+}
+
+Rel(user, app, "Provides input file", "Plain-text file")
+Rel(app, user, "Writes results file", "Plain-text file")
+
+@enduml
