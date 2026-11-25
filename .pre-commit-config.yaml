@@ -62,3 +62,11 @@ repos:
         language: system
         files: \.puml$
         pass_filenames: false
+
+      # Docker-based testing
+      - id: docker-test
+        name: Run tests inside Docker
+        entry: scripts/hooks/docker-test.sh
+        language: system
+        files: ^(src/|tests/|Dockerfile$|requirements\.txt$)
+        pass_filenames: false
