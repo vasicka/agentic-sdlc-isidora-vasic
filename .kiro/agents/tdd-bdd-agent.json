@@ -1,0 +1,45 @@
+{
+  "name": "tdd-bdd-agent",
+  "description": "TDD/BDD agent — implements BankOCR features using strict RED-GREEN-REFACTOR discipline, one test at a time",
+  "prompt": "file://./tdd-bdd-prompt.md",
+  "tools": [
+    "read",
+    "shell",
+    "write"
+  ],
+  "allowedTools": [
+    "read"
+  ],
+  "resources": [
+    "file://docs/user-stories/**/*.md"
+  ],
+  "hooks": [
+    {
+      "name": "postToolUse-0",
+      "trigger": "postToolUse",
+      "matcher": "write",
+      "action": {
+        "type": "command",
+        "command": "docker run --rm -v \"$(pwd):/app\" -w /app kata-tests pytest tests/ -v --tb=short"
+      },
+      "timeout": 10
+    }
+  ],
+  "permissions": {
+    "rules": [
+      {
+        "capability": "fs_read",
+        "effect": "allow"
+      },
+      {
+        "capability": "skill",
+        "effect": "allow"
+      }
+    ]
+  },
+  "kiroUpgrade": {
+    "revision": 3,
+    "fingerprint": "sha256:69c03ccb3214f6454159c21dcb639879deb76da3069b3b75268afa094379e5a2",
+    "source": "sha256:9a87eaf6f8427a87403fddcf7e95def1512b73fec5fd86dcad0cab20a9578ea1"
+  }
+}
