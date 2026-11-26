@@ -126,3 +126,42 @@ def test_parsing_be_001_1_s001_given_nine_glyph_when_recognised_then_returns_nin
 
     # THEN
     assert result == "9"
+
+
+def test_parsing_be_001_1_s002_given_complete_entry_with_nine_zeros():
+    from src.parser import parse_entry
+
+    # GIVEN
+    # A four-line entry with nine zeros
+    entry = (
+        " _  _  _  _  _  _  _  _  _ ",
+        "| || || || || || || || || |",
+        "|_||_||_||_||_||_||_||_||_|",
+        "",
+    )
+
+    # WHEN
+    result = parse_entry(entry)
+
+    # THEN
+    assert result == "000000000"
+
+
+def test_parsing_be_001_1_s002_given_complete_entry_with_123456789():
+    from src.parser import parse_entry
+
+    # GIVEN
+    # A four-line entry with digits 123456789
+    # Based on BankOCR kata examples
+    entry = (
+        "    _  _     _  _  _  _  _ ",
+        "  | _| _||_||_ |_   ||_||_|",
+        "  ||_  _|  | _||_|  ||_| _|",
+        "",
+    )
+
+    # WHEN
+    result = parse_entry(entry)
+
+    # THEN
+    assert result == "123456789"
