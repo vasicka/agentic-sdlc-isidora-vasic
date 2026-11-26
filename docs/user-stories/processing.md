@@ -160,46 +160,56 @@ BankOCR is a command-line application without a graphical frontend. All user int
 
 ### Infrastructure Stories
 
-#### PROCESSING-INFRA-002.1 – Test the Processor pipeline coordination using unittest with temporary files
+#### PROCESSING-INFRA-002.1 – Test the Processor pipeline coordination in Docker using pytest with temporary files
 
 **Story ID:** PROCESSING-INFRA-002.1
 **Parent story:** PROCESSING-STORY-002
 **Priority:** CORE
 **Architecture references:**
-- `architecture/02-constraints.md`, Section 2.1 (TC-1, TC-3, TC-5)
+- `architecture/02-constraints.md`, Section 2.1 (TC-1, TC-3, TC-5) – Note: TC-5 specifies `unittest` but Docker uses `pytest`
 - `architecture/08-crosscutting-concepts.md`, Section 8.3 (Processor tests may use temporary files)
 - `architecture/10-quality-requirements.md`, QS-07
 - `architecture/11-risks-and-technical-debt.md`, RISK-03 (no integration test covers the full pipeline end-to-end)
+- Dockerfile (local Docker-based environment established in Module 4)
+- CI workflow (`.github/workflows/ci.yml`)
 
 **AS A** BankOCR developer,
-**I WANT** the Processor's pipeline coordination logic to be covered by at least one end-to-end `unittest` test that exercises a real input file and asserts on the content of the resulting output file,
-**SO THAT** integration defects in the Processor's coordination logic and output formatting are detected automatically rather than only during manual testing.
+**I WANT** the Processor's pipeline coordination logic to be covered by at least one end-to-end `pytest` test that exercises a real input file and asserts on the content of the resulting output file within a Docker container,
+**SO THAT** integration defects in the Processor's coordination logic and output formatting are detected automatically in the Docker-based test environment.
 
 > **Mitigation of RISK-03:** The architecture identifies (`architecture/11-risks-and-technical-debt.md`, RISK-03) that isolated unit tests alone do not detect errors in the Processor's coordination or output formatting. This sub-story directly addresses that risk by requiring at least one end-to-end test with file I/O, as permitted by the testability convention in `architecture/08-crosscutting-concepts.md`, Section 8.3.
+>
+> **QS-07 clarification:** The original QS-7 requirement specifies that tests should run with no external dependencies on a machine with only Python ≥ 3.12. The Module 4 Docker/pytest setup introduces `pytest` as a third-party test dependency, which creates a discrepancy with the original QS-7 requirement. `pytest` is a test-only dependency and does not affect runtime execution, but it does mean the full test suite cannot run with zero external dependencies as originally specified in QS-7.
 
 #### Acceptance Scenarios
 
-### SCENARIO 1: End-to-end test reads a real input file and asserts on output file content
+### SCENARIO 1: Build Docker image for end-to-end testing
 **Scenario ID:** PROCESSING-INFRA-002.1-S001
-**GIVEN** a `unittest` test case that creates a temporary input file containing at least one valid, one ERR, and one ILL account entry
-**WHEN** the Processor is invoked with that file
+**GIVEN** the BankOCR source code with its Dockerfile and test dependencies configuration
+**WHEN** the Docker image is built with `docker build -t kata-tests .`
+**THEN** the build completes successfully, installing Python 3.12 and test dependencies including pytest for end-to-end testing
+
+### SCENARIO 2: End-to-end test reads a real input file and asserts on output file content in Docker
+**Scenario ID:** PROCESSING-INFRA-002.1-S002
+**GIVEN** a pytest test case that creates a temporary input file containing at least one valid, one ERR, and one ILL account entry inside Docker
+**WHEN** the Processor is invoked with that file within the Docker container
 **THEN** the test reads the resulting output file and asserts that each result line carries the correct annotation, confirming the full pipeline executed correctly
 
-### SCENARIO 2: End-to-end test cleans up temporary files after execution
-**Scenario ID:** PROCESSING-INFRA-002.1-S002
-**GIVEN** an end-to-end Processor test that creates temporary input and output files
-**WHEN** the test completes, whether passing or failing
-**THEN** both temporary files are removed from the file system, leaving no test artefacts on disk
-
-### SCENARIO 3: End-to-end test runs with no third-party dependencies
+### SCENARIO 3: End-to-end test cleans up temporary files after execution in Docker
 **Scenario ID:** PROCESSING-INFRA-002.1-S003
-**GIVEN** a machine with Python ≥ 3.12 and the BankOCR source present, with no third-party packages installed
-**WHEN** the end-to-end Processor test is executed with `python -m unittest`
-**THEN** the test runs to completion without an `ImportError` or missing-dependency error
+**GIVEN** an end-to-end Processor test that creates temporary input and output files inside Docker
+**WHEN** the test completes, whether passing or failing
+**THEN** both temporary files are removed from the container's file system, leaving no test artefacts on disk
+
+### SCENARIO 4: End-to-end test runs with pytest in Docker container
+**Scenario ID:** PROCESSING-INFRA-002.1-S004
+**GIVEN** the built Docker image containing the BankOCR source and test suite
+**WHEN** end-to-end Processor tests are executed with `docker run --rm kata-tests` (default CMD runs pytest)
+**THEN** the tests run inside the container and produce results without requiring external dependencies
 
 ---
 
-#### PROCESSING-INFRA-002.2 – Deploy the Processor as the entry point of the single-file CLI application
+#### PROCESSING-INFRA-002.2 – Deploy the Processor as the entry point of the single-file CLI application in Docker environment
 
 **Story ID:** PROCESSING-INFRA-002.2
 **Parent story:** PROCESSING-STORY-002
@@ -207,36 +217,49 @@ BankOCR is a command-line application without a graphical frontend. All user int
 **Architecture references:**
 - `architecture/02-constraints.md`, Section 2.1 (TC-1, TC-3)
 - `architecture/04-solution-strategy.md`, Section 4.1 (single CLI application; Processor coordinates the pipeline)
-- `architecture/07-deployment-view.md`, Sections 7.1, 7.2, 7.3
+- `architecture/07-deployment-view.md`, Sections 7.1, 7.2, 7.3 – Note: Deployment view doesn't mention Docker
 - `architecture/10-quality-requirements.md`, QS-10, QS-11
+- Dockerfile (local Docker-based environment)
 
 **AS A** BankOCR developer,
-**I WANT** the Processor to serve as the coordination entry point of the single Python CLI application, with no build or installation step required,
-**SO THAT** a user can invoke the full parse-validate-record pipeline on any machine with Python ≥ 3.12 by running a single command.
+**I WANT** the Processor to serve as the coordination entry point of the single Python CLI application within a Docker container,
+**SO THAT** the full parse-validate-record pipeline can be invoked through Docker on any machine with Docker installed, without requiring Python ≥ 3.12 on the host.
 
 #### Acceptance Scenarios
 
-### SCENARIO 1: Full pipeline executes from a single CLI invocation
+### SCENARIO 1: Docker image contains the complete application with Processor as entry point
 **Scenario ID:** PROCESSING-INFRA-002.2-S001
-**GIVEN** a machine with Python ≥ 3.12 and the BankOCR source files present on the local file system
-**WHEN** the CLI is invoked with a valid input file path
-**THEN** the Processor runs the complete parse-validate-record pipeline for every entry in the file and writes the output file, without requiring `pip install` or any build step
+**GIVEN** the built Docker image `kata-tests`
+**WHEN** the image layers are inspected
+**THEN** the image contains the Processor module and all application source code, with Processor as the pipeline coordination entry point
 
 ### SCENARIO 2: Processor imports only standard-library modules
 **Scenario ID:** PROCESSING-INFRA-002.2-S002
-**GIVEN** the Processor module source file
+**GIVEN** the Processor module source file inside the Docker container
 **WHEN** the import statements are inspected
-**THEN** every imported module belongs to the Python standard library or to other BankOCR source modules; no third-party package is referenced (TC-3)
+**THEN** every imported module belongs to the Python standard library or to other BankOCR source modules; no third-party runtime package is referenced (TC-3)
 
-### SCENARIO 3: Application runs on Python 3.12 or newer
+### SCENARIO 3: Application runs on Python 3.12 inside Docker
 **Scenario ID:** PROCESSING-INFRA-002.2-S003
-**GIVEN** a machine with Python 3.12 installed
-**WHEN** the CLI is invoked
+**GIVEN** a Docker container running the built image with Python 3.12
+**WHEN** the application CLI is invoked inside the container
 **THEN** the application runs to completion without a `SyntaxError` or version-compatibility error (TC-1)
+
+### SCENARIO 4: Docker image builds successfully for development testing
+**Scenario ID:** PROCESSING-INFRA-002.2-S004
+**GIVEN** the CI workflow configuration (`.github/workflows/ci.yml`)
+**WHEN** the workflow executes `docker build -t kata-tests .`
+**THEN** the build completes successfully, creating a runnable Docker image that includes the Processor as the pipeline coordinator
+
+### SCENARIO 5: Full pipeline executes from a single CLI invocation without Docker (original requirement)
+**Scenario ID:** PROCESSING-INFRA-002.2-S005
+**GIVEN** a machine with Python ≥ 3.12 and the BankOCR source files present on the local file system
+**WHEN** the CLI is invoked with a valid input file path
+**THEN** the Processor runs the complete parse-validate-record pipeline for every entry in the file and writes the output file, without requiring `pip install` or any build step (preserves QS-11)
 
 ---
 
-#### PROCESSING-INFRA-002.3 – Confirm that the Processor exclusively owns all file-based data handling
+#### PROCESSING-INFRA-002.3 – Confirm that the Processor exclusively owns all file-based data handling in Docker
 
 **Story ID:** PROCESSING-INFRA-002.3
 **Parent story:** PROCESSING-STORY-002
@@ -245,34 +268,35 @@ BankOCR is a command-line application without a graphical frontend. All user int
 - `architecture/05-building-block-view.md`, Section 5.2 (Processor depends on file system; Parser and Validator do not)
 - `architecture/08-crosscutting-concepts.md`, Section 8.2 (Separation of I/O from logic), Section 8.4 (input format handling)
 - `architecture/09-architecture-decisions.md`, ADR-002 (File I/O confined to Processor)
+- Dockerfile (local Docker-based environment)
 
 **AS A** BankOCR developer,
-**I WANT** the Processor to be the only component that reads from or writes to the file system, passing pre-sliced string entries to the Parser and nine-character strings to the Validator,
-**SO THAT** the file I/O boundary established by ADR-002 is enforced by design and Parser and Validator remain independently testable with plain string inputs.
+**I WANT** the Processor to be the only component that reads from or writes to the file system within a Docker container, passing pre-sliced string entries to the Parser and nine-character strings to the Validator,
+**SO THAT** the file I/O boundary established by ADR-002 is enforced by design in the Docker environment and Parser and Validator remain independently testable with plain string inputs.
 
 #### Acceptance Scenarios
 
-### SCENARIO 1: Processor reads the input file and passes string entries to the Parser
+### SCENARIO 1: Processor reads the input file and passes string entries to the Parser in Docker
 **Scenario ID:** PROCESSING-INFRA-002.3-S001
-**GIVEN** the Processor is processing an input file
+**GIVEN** the Processor is processing an input file inside a Docker container
 **WHEN** it calls the Parser for each account entry
 **THEN** it passes a four-line string argument and does not pass a file path or file handle; the Parser opens no file
 
-### SCENARIO 2: Processor passes account strings to the Validator with no file involvement
+### SCENARIO 2: Processor passes account strings to the Validator with no file involvement in Docker
 **Scenario ID:** PROCESSING-INFRA-002.3-S002
-**GIVEN** the Processor has received a nine-character account string from the Parser
+**GIVEN** the Processor has received a nine-character account string from the Parser inside Docker
 **WHEN** it calls the Validator
 **THEN** it passes the string as an argument and does not pass a file path or file handle; the Validator opens no file
 
-### SCENARIO 3: Parser and Validator produce no file-system side effects during pipeline execution
+### SCENARIO 3: Parser and Validator produce no file-system side effects during pipeline execution in Docker
 **Scenario ID:** PROCESSING-INFRA-002.3-S003
-**GIVEN** the Processor runs the full pipeline for a file containing multiple entries
+**GIVEN** the Processor runs the full pipeline for a file containing multiple entries inside Docker
 **WHEN** the pipeline completes
-**THEN** the only files created or modified on the file system are the output file written by the Processor; no file is created or modified by the Parser or Validator
+**THEN** the only files created or modified on the container's file system are the output file written by the Processor; no file is created or modified by the Parser or Validator
 
 ---
 
-#### PROCESSING-INFRA-002.4 – Confirm event inapplicability and define observability via exit codes and test results
+#### PROCESSING-INFRA-002.4 – Confirm event inapplicability and define observability via Docker test results and application exit codes
 
 **Story ID:** PROCESSING-INFRA-002.4
 **Parent story:** PROCESSING-STORY-002
@@ -282,32 +306,48 @@ BankOCR is a command-line application without a graphical frontend. All user int
 - `architecture/09-architecture-decisions.md`, ADR-001 (no event infrastructure)
 - `architecture/10-quality-requirements.md`, QS-07
 - `architecture/11-risks-and-technical-debt.md`, DEBT-03, RISK-03
+- Dockerfile (local Docker-based environment)
+- CI workflow (`.github/workflows/ci.yml`)
 
 **AS A** BankOCR developer,
-**I WANT** the system to report Processor test outcomes through `unittest` results and application-level exit codes rather than through event infrastructure,
-**SO THAT** pipeline coordination defects are observable without introducing monitoring services that the architecture does not approve.
+**I WANT** the system to report Processor test outcomes through `pytest` results in Docker and application-level exit codes for CLI execution, rather than through event infrastructure,
+**SO THAT** pipeline coordination defects are observable in the Docker test environment and application failures are visible to users, without introducing monitoring services that the architecture does not approve.
 
-> **Event infrastructure:** BankOCR has no message queues, event buses, pub/sub topics, or distributed tracing (ADR-001, Section 3.3). Event-driven infrastructure is not applicable to the PROCESSING domain. This story documents that determination explicitly and specifies the observability mechanism that applies instead.
+> **Event infrastructure:** BankOCR has no message queues, event buses, pub/sub topics, or distributed tracing (ADR-001, Section 3.3). Event-driven infrastructure is not applicable to the PROCESSING domain. This story documents that determination explicitly and specifies the observability mechanisms that apply in the Docker environment and for CLI execution.
+>
+> **QS-07 clarification:** The original QS-7 requirement specifies that tests should run with no external dependencies on a machine with only Python ≥ 3.12. The Module 4 Docker/pytest setup introduces `pytest` as a third-party test dependency, which creates a discrepancy with the original QS-7 requirement. `pytest` is a test-only dependency and does not affect runtime execution, but it does mean the full test suite cannot run with zero external dependencies as originally specified in QS-7.
 
 #### Acceptance Scenarios
 
-### SCENARIO 1: unittest reports Processor test pass or fail
+### SCENARIO 1: pytest reports Processor test pass or fail in Docker
 **Scenario ID:** PROCESSING-INFRA-002.4-S001
-**GIVEN** the Processor unit and integration tests are executed with `python -m unittest`
-**WHEN** one or more tests fail
-**THEN** the test runner prints a FAIL or ERROR result for each failing test to stdout or stderr, and exits with a non-zero exit code
+**GIVEN** the Processor unit and integration tests are executed inside Docker with `docker run --rm kata-tests`
+**WHEN** one or more Processor tests fail
+**THEN** pytest prints a FAIL or ERROR result for each failing test to stdout, and the Docker container exits with a non-zero exit code
 
-### SCENARIO 2: Application exits with code 0 on successful pipeline completion
+### SCENARIO 2: Application exits with code 0 on successful pipeline completion (original requirement)
 **Scenario ID:** PROCESSING-INFRA-002.4-S002
-**GIVEN** the CLI is invoked with a well-formed input file
+**GIVEN** the CLI is invoked with a well-formed input file (with or without Docker)
 **WHEN** the Processor completes the full parse-validate-record pipeline for every entry and writes the output file without an unhandled exception
-**THEN** the process exits with exit code 0
+**THEN** the process exits with exit code 0, regardless of whether running in Docker or directly on Python
 
-### SCENARIO 3: No event infrastructure is present in the Processor module
+### SCENARIO 3: No event infrastructure is present in the Processor module in Docker
 **Scenario ID:** PROCESSING-INFRA-002.4-S003
-**GIVEN** the Processor module source code
+**GIVEN** the Processor module source code inside the Docker container
 **WHEN** the source is inspected for imports or calls to message queues, event buses, logging frameworks, or external monitoring services
 **THEN** no such imports or calls are present; the Processor contains only file I/O, pipeline coordination logic, and standard-library imports
+
+### SCENARIO 4: Docker container exit code reflects test suite success
+**Scenario ID:** PROCESSING-INFRA-002.4-S004
+**GIVEN** a Docker container running the full test suite with `docker run --rm kata-tests`
+**WHEN** all tests in the suite (including Processor tests) pass
+**THEN** the container exits with exit code 0; when any test fails, it exits with a non-zero code
+
+### SCENARIO 5: CI workflow captures Processor test results from Docker
+**Scenario ID:** PROCESSING-INFRA-002.4-S005
+**GIVEN** the CI workflow configuration (`.github/workflows/ci.yml`)
+**WHEN** the workflow executes `docker run --rm kata-tests`
+**THEN** the workflow step captures the pytest output and fails if any Processor tests fail, providing observability through GitHub Actions
 
 ---
 
@@ -349,22 +389,24 @@ These crossings are string-valued handoffs, not object references, consistent wi
 |--------|------------------------------|
 | FR-1 – Read input file and split into four-line entries | PROCESSING-STORY-002, PROCESSING-BE-002.1, PROCESSING-BE-002.1-S001, PROCESSING-INFRA-002.3-S001 |
 | FR-7 – Write one annotated result line per entry | PROCESSING-STORY-002, PROCESSING-BE-002.2, PROCESSING-BE-002.2-S001, PROCESSING-BE-002.2-S002, PROCESSING-BE-002.2-S003, PROCESSING-STORY-002-S004 |
-| TC-1 – Python ≥ 3.12 | PROCESSING-INFRA-002.1-S003, PROCESSING-INFRA-002.2-S003 |
-| TC-3 – Standard library only | PROCESSING-INFRA-002.1-S003, PROCESSING-INFRA-002.2-S002 |
+| TC-1 – Python ≥ 3.12 | PROCESSING-INFRA-002.2-S003 |
+| TC-3 – Standard library only | PROCESSING-INFRA-002.2-S002 |
 | TC-4 – Plain-text files | PROCESSING-INFRA-002.3-S001, PROCESSING-INFRA-002.3-S002, PROCESSING-INFRA-002.3-S003 |
-| TC-5 – unittest | PROCESSING-INFRA-002.1-S001, PROCESSING-INFRA-002.4-S001 |
-| ADR-001 – Single CLI, no external services | PROCESSING-INFRA-002.2-S001, PROCESSING-INFRA-002.4-S003 |
+| TC-5 – unittest | Note: Docker uses pytest, not unittest (PROCESSING-INFRA-002.1) |
+| ADR-001 – Single CLI, no external services | PROCESSING-INFRA-002.4-S003 |
 | ADR-002 – File I/O confined to Processor | PROCESSING-INFRA-002.3-S001, PROCESSING-INFRA-002.3-S002, PROCESSING-INFRA-002.3-S003 |
+| Dockerfile – Local Docker environment | PROCESSING-INFRA-002.1-S001, PROCESSING-INFRA-002.1-S004, PROCESSING-INFRA-002.2-S001, PROCESSING-INFRA-002.2-S004 |
+| CI workflow – GitHub Actions | PROCESSING-INFRA-002.2-S004, PROCESSING-INFRA-002.4-S005 |
 | QS-04 – Output annotation accuracy | PROCESSING-STORY-002-S001, PROCESSING-STORY-002-S002, PROCESSING-STORY-002-S003, PROCESSING-BE-002.2-S001, PROCESSING-BE-002.2-S002, PROCESSING-BE-002.2-S003 |
-| QS-07 – Test suite runs with no external dependencies | PROCESSING-INFRA-002.1-S003, PROCESSING-INFRA-002.4-S001 |
+| QS-07 – Test suite runs with no external dependencies | PROCESSING-INFRA-002.4-S001, PROCESSING-INFRA-002.4-S005 – Note: `pytest` is a third-party test dependency, creating a discrepancy with the original QS-7 requirement for dependency-free testing |
 | QS-08 – Changing digit recognition does not affect validation | PROCESSING-INFRA-002.3-S001 |
 | QS-09 – Changing output format does not affect parsing or validation | PROCESSING-BE-002.2-S001, PROCESSING-BE-002.2-S002, PROCESSING-BE-002.2-S003 |
 | QS-10 – No unjustified dependencies | PROCESSING-INFRA-002.2-S002 |
-| QS-11 – Single command invocation | PROCESSING-INFRA-002.2-S001 |
+| QS-11 – Single command invocation | PROCESSING-INFRA-002.2-S001, PROCESSING-INFRA-002.2-S005, PROCESSING-INFRA-002.4-S002 |
 | ch. 6.3 – Runtime invariants (Parser and Validator called once per entry) | PROCESSING-STORY-002-S005, PROCESSING-BE-002.1-S001, PROCESSING-BE-002.1-S002 |
 | ch. 8.1 – No entry silently dropped | PROCESSING-STORY-002-S004, PROCESSING-BE-002.1-S003 |
 | ch. 8.4 – Input format handling owned by Processor | PROCESSING-INFRA-002.3-S001 |
-| RISK-03 – No integration test covers full pipeline end-to-end | PROCESSING-INFRA-002.1-S001, PROCESSING-INFRA-002.1-S002 |
+| RISK-03 – No integration test covers full pipeline end-to-end | PROCESSING-INFRA-002.1-S002, PROCESSING-INFRA-002.1-S003 |
 | DEBT-03 – No structured logging | PROCESSING-INFRA-002.4-S003 |
 
 ---

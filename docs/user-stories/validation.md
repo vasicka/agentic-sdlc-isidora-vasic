@@ -154,44 +154,56 @@ BankOCR is a command-line application without a graphical frontend. All user int
 
 ### Infrastructure Stories
 
-#### VALIDATION-INFRA-001.1 – Execute Validator unit tests in isolation using unittest
+#### VALIDATION-INFRA-001.1 – Execute Validator tests in Docker container using pytest
 
 **Story ID:** VALIDATION-INFRA-001.1
 **Parent story:** VALIDATION-STORY-001
 **Priority:** CORE
 **Architecture references:**
-- `architecture/02-constraints.md`, Section 2.1 (TC-1, TC-3, TC-5)
+- `architecture/02-constraints.md`, Section 2.1 (TC-1, TC-3, TC-5) – Note: TC-5 specifies `unittest` but Docker uses `pytest`
 - `architecture/05-building-block-view.md`, Section 5.2 (Dependency rules: Validator has no file-system dependency)
 - `architecture/08-crosscutting-concepts.md`, Section 8.3 (Validator testability convention)
 - `architecture/10-quality-requirements.md`, QS-06, QS-07
+- Dockerfile (local Docker-based environment established in Module 4)
+- CI workflow (`.github/workflows/ci.yml`)
 
 **AS A** BankOCR developer,
-**I WANT** the Validator to be exercisable in complete isolation using Python's built-in `unittest` framework, by passing nine-character strings directly with no file-system dependencies,
-**SO THAT** checksum and ILL-detection defects are pinpointed immediately without requiring file fixtures or external tools.
+**I WANT** the Validator to be exercisable in complete isolation within a Docker container using `pytest`, by passing nine-character strings directly with no file-system dependencies,
+**SO THAT** checksum and ILL-detection defects are pinpointed immediately in the local Docker-based test environment.
+
+> **Note:** This story reflects the local Docker-based environment established in Module 4. TC-5 specifies `unittest`, but the Docker setup uses `pytest` for testing. `pytest` is a test dependency, not a runtime dependency, so it does not violate TC-3 (standard library only for runtime).
+>
+> **QS-07 clarification:** The original QS-7 requirement specifies that tests should run with no external dependencies on a machine with only Python ≥ 3.12. The Module 4 Docker/pytest setup introduces `pytest` as a third-party test dependency, which creates a discrepancy with the original QS-7 requirement. `pytest` is a test-only dependency and does not affect runtime execution, but it does mean the full test suite cannot run with zero external dependencies as originally specified in QS-7.
 
 #### Acceptance Scenarios
 
-### SCENARIO 1: Run Validator tests with no third-party dependencies
+### SCENARIO 1: Build Docker image for Validator testing
 **Scenario ID:** VALIDATION-INFRA-001.1-S001
-**GIVEN** a machine with Python ≥ 3.12 installed and the BankOCR source present, and no third-party packages installed
-**WHEN** the Validator unit tests are executed with `python -m unittest`
-**THEN** the test runner starts and completes without an `ImportError` or missing-dependency error
+**GIVEN** the BankOCR source code with its Dockerfile and test dependencies configuration
+**WHEN** the Docker image is built with `docker build -t kata-tests .`
+**THEN** the build completes successfully, installing Python 3.12 and test dependencies including pytest
 
-### SCENARIO 2: Pass a nine-character string directly to the Validator without file I/O
+### SCENARIO 2: Execute Validator tests inside Docker container
 **Scenario ID:** VALIDATION-INFRA-001.1-S002
-**GIVEN** a `unittest` test case that constructs a nine-character account string as a Python string literal
-**WHEN** that string is passed directly to the Validator
+**GIVEN** the built Docker image containing the BankOCR source and test suite
+**WHEN** tests are executed with `docker run --rm kata-tests` (default CMD runs pytest)
+**THEN** the Validator tests run inside the container with no external file system dependencies and produce test results
+
+### SCENARIO 3: Pass a nine-character string directly to the Validator without file I/O
+**Scenario ID:** VALIDATION-INFRA-001.1-S003
+**GIVEN** a pytest test case that constructs a nine-character account string as a Python string literal
+**WHEN** that string is passed directly to the Validator inside the Docker container
 **THEN** the Validator returns one of `VALID`, `ERR`, or `ILL`, and no file is read from or written to the file system
 
-### SCENARIO 3: Validator tests require no file fixtures
-**Scenario ID:** VALIDATION-INFRA-001.1-S003
-**GIVEN** the full Validator test suite
-**WHEN** the suite is executed
-**THEN** no test creates, reads, or deletes a file on disk, and no temporary directory is required
+### SCENARIO 4: Validator tests require no file fixtures when running in Docker
+**Scenario ID:** VALIDATION-INFRA-001.1-S004
+**GIVEN** the full Validator test suite executed inside Docker
+**WHEN** the test suite runs
+**THEN** no test creates, reads, or deletes a file on the host file system, and no temporary directory is mounted or required
 
 ---
 
-#### VALIDATION-INFRA-001.2 – Deploy the Validator as part of the single-file CLI application
+#### VALIDATION-INFRA-001.2 – Deploy the Validator as part of the single-file CLI application in Docker environment
 
 **Story ID:** VALIDATION-INFRA-001.2
 **Parent story:** VALIDATION-STORY-001
@@ -199,36 +211,49 @@ BankOCR is a command-line application without a graphical frontend. All user int
 **Architecture references:**
 - `architecture/02-constraints.md`, Section 2.1 (TC-1, TC-3)
 - `architecture/04-solution-strategy.md`, Section 4.1 (single CLI application)
-- `architecture/07-deployment-view.md`, Sections 7.1, 7.2, 7.3
+- `architecture/07-deployment-view.md`, Sections 7.1, 7.2, 7.3 – Note: Deployment view doesn't mention Docker
 - `architecture/10-quality-requirements.md`, QS-10, QS-11
+- Dockerfile (local Docker-based environment)
 
 **AS A** BankOCR developer,
-**I WANT** the Validator to be packaged as part of the single Python CLI application with no build or installation step,
-**SO THAT** a user can invoke the application on any machine with Python ≥ 3.12 without installing additional packages.
+**I WANT** the Validator to be packaged as part of the single Python CLI application within a Docker container,
+**SO THAT** the application can be invoked through Docker on any machine with Docker installed, without requiring Python ≥ 3.12 on the host.
 
 #### Acceptance Scenarios
 
-### SCENARIO 1: Application runs without package installation
+### SCENARIO 1: Docker image contains the complete application with Validator
 **Scenario ID:** VALIDATION-INFRA-001.2-S001
-**GIVEN** a machine with Python ≥ 3.12 and the BankOCR source files present on the local file system
-**WHEN** the CLI is invoked from the command line with a valid input file path
-**THEN** the application starts and the Validator executes without requiring `pip install` or any build step
+**GIVEN** the built Docker image `kata-tests`
+**WHEN** the image layers are inspected
+**THEN** the image contains the Validator module and all application source code, ready for execution inside the container
 
 ### SCENARIO 2: Validator imports only standard-library modules
 **Scenario ID:** VALIDATION-INFRA-001.2-S002
-**GIVEN** the Validator module source file
+**GIVEN** the Validator module source file inside the Docker container
 **WHEN** the import statements are inspected
-**THEN** every imported module belongs to the Python standard library and no third-party package is referenced (TC-3)
+**THEN** every imported module belongs to the Python standard library and no third-party runtime package is referenced (TC-3)
 
-### SCENARIO 3: Application runs on Python 3.12 or newer
+### SCENARIO 3: Application runs on Python 3.12 inside Docker
 **Scenario ID:** VALIDATION-INFRA-001.2-S003
-**GIVEN** a machine with Python 3.12 installed
-**WHEN** the CLI is invoked
+**GIVEN** a Docker container running the built image with Python 3.12
+**WHEN** the application CLI is invoked inside the container
 **THEN** the application runs to completion without a `SyntaxError` or version-compatibility error (TC-1)
+
+### SCENARIO 4: Docker image builds successfully for development testing
+**Scenario ID:** VALIDATION-INFRA-001.2-S004
+**GIVEN** the CI workflow configuration (`.github/workflows/ci.yml`)
+**WHEN** the workflow executes `docker build -t kata-tests .`
+**THEN** the build completes successfully, creating a runnable Docker image that includes the Validator
+
+### SCENARIO 5: Application runs without Docker installation (original CLI requirement)
+**Scenario ID:** VALIDATION-INFRA-001.2-S005
+**GIVEN** a machine with Python ≥ 3.12 and the BankOCR source files present on the local file system
+**WHEN** the CLI is invoked from the command line with a valid input file path
+**THEN** the application starts and the Validator executes without requiring `pip install` or any build step (preserves QS-11)
 
 ---
 
-#### VALIDATION-INFRA-001.3 – Confirm that the Validator operates on in-memory strings with no file-based data handling
+#### VALIDATION-INFRA-001.3 – Confirm that the Validator operates on in-memory strings with no file-based data handling in Docker
 
 **Story ID:** VALIDATION-INFRA-001.3
 **Parent story:** VALIDATION-STORY-001
@@ -237,36 +262,37 @@ BankOCR is a command-line application without a graphical frontend. All user int
 - `architecture/05-building-block-view.md`, Section 5.2 (Validator has no file-system dependency)
 - `architecture/08-crosscutting-concepts.md`, Section 8.2 (Separation of I/O from logic)
 - `architecture/09-architecture-decisions.md`, ADR-002 (File I/O confined to Processor)
+- Dockerfile (local Docker-based environment)
 
 **AS A** BankOCR developer,
-**I WANT** the Validator to receive account strings as in-memory string arguments and return status values as return values, with no direct file access,
-**SO THAT** the Validator can be tested and reused without any dependency on the file system.
+**I WANT** the Validator to receive account strings as in-memory string arguments and return status values as return values within the Docker container, with no direct file access,
+**SO THAT** the Validator can be tested and reused without any dependency on the file system, consistent with ADR-002.
 
-> **Note:** File I/O is owned exclusively by the Processor (ADR-002, `architecture/05-building-block-view.md`, Section 5.2). This story confirms the Validator's compliance with that boundary; it does not assign file-handling responsibilities to the Validator.
+> **Note:** File I/O is owned exclusively by the Processor (ADR-002, `architecture/05-building-block-view.md`, Section 5.2). This story confirms the Validator's compliance with that boundary in the Docker environment; it does not assign file-handling responsibilities to the Validator.
 
 #### Acceptance Scenarios
 
-### SCENARIO 1: Validator accepts a string argument, not a file path
+### SCENARIO 1: Validator accepts a string argument, not a file path, in Docker container
 **Scenario ID:** VALIDATION-INFRA-001.3-S001
-**GIVEN** the Validator's public interface
+**GIVEN** the Validator's public interface inside the Docker container
 **WHEN** it is called with a nine-character account string
-**THEN** it processes the string in memory and returns one of `VALID`, `ERR`, or `ILL` without opening any file
+**THEN** it processes the string in memory and returns one of `VALID`, `ERR`, or `ILL` without opening any file or accessing host file system
 
-### SCENARIO 2: Validator produces no file-system side effects
+### SCENARIO 2: Validator produces no file-system side effects in Docker
 **Scenario ID:** VALIDATION-INFRA-001.3-S002
-**GIVEN** an invocation of the Validator with a valid nine-character account string
+**GIVEN** an invocation of the Validator with a valid nine-character account string inside Docker
 **WHEN** the Validator runs to completion
-**THEN** no file is created, modified, or deleted on the file system as a side effect
+**THEN** no file is created, modified, or deleted on the container's file system or host file system as a side effect
 
-### SCENARIO 3: Changing file paths does not affect Validator output
+### SCENARIO 3: Validator behavior is consistent regardless of container file paths
 **Scenario ID:** VALIDATION-INFRA-001.3-S003
-**GIVEN** two calls to the Validator with identical nine-character account string content
-**WHEN** the calls are made in environments with different working directories
-**THEN** both calls return the identical status value, confirming no file-path dependency
+**GIVEN** two Docker containers running the same image but with different mounted volumes or working directories
+**WHEN** the Validator is called with identical nine-character account string content in both containers
+**THEN** both calls return the identical status value, confirming no dependency on container file paths or mounted volumes
 
 ---
 
-#### VALIDATION-INFRA-001.4 – Confirm event inapplicability and define observability via test results and exit codes
+#### VALIDATION-INFRA-001.4 – Confirm event inapplicability and define observability via pytest results and Docker exit codes
 
 **Story ID:** VALIDATION-INFRA-001.4
 **Parent story:** VALIDATION-STORY-001
@@ -276,32 +302,48 @@ BankOCR is a command-line application without a graphical frontend. All user int
 - `architecture/09-architecture-decisions.md`, ADR-001 (no event infrastructure)
 - `architecture/10-quality-requirements.md`, QS-07
 - `architecture/11-risks-and-technical-debt.md`, DEBT-03
+- Dockerfile (local Docker-based environment)
+- CI workflow (`.github/workflows/ci.yml`)
 
 **AS A** BankOCR developer,
-**I WANT** the system to report Validator test outcomes through `unittest` results and application-level exit codes rather than through event infrastructure,
-**SO THAT** errors in checksum logic or ILL detection are visible without introducing monitoring services that the architecture does not approve.
+**I WANT** the system to report Validator test outcomes through `pytest` results and Docker container exit codes rather than through event infrastructure,
+**SO THAT** errors in checksum logic or ILL detection are visible in the Docker-based test environment without introducing monitoring services that the architecture does not approve.
 
-> **Event infrastructure:** BankOCR has no message queues, event buses, pub/sub topics, or distributed tracing (ADR-001, Section 3.3). Event-driven infrastructure is not applicable to the VALIDATION domain. This story documents that determination explicitly and specifies the observability mechanism that applies instead.
+> **Event infrastructure:** BankOCR has no message queues, event buses, pub/sub topics, or distributed tracing (ADR-001, Section 3.3). Event-driven infrastructure is not applicable to the VALIDATION domain. This story documents that determination explicitly and specifies the observability mechanism that applies in the Docker environment.
+>
+> **QS-07 clarification:** The original QS-7 requirement specifies that tests should run with no external dependencies on a machine with only Python ≥ 3.12. The Module 4 Docker/pytest setup introduces `pytest` as a third-party test dependency, which creates a discrepancy with the original QS-7 requirement. `pytest` is a test-only dependency and does not affect runtime execution, but it does mean the full test suite cannot run with zero external dependencies as originally specified in QS-7.
 
 #### Acceptance Scenarios
 
-### SCENARIO 1: unittest reports Validator test pass or fail
+### SCENARIO 1: pytest reports Validator test pass or fail in Docker
 **Scenario ID:** VALIDATION-INFRA-001.4-S001
-**GIVEN** the Validator unit tests are executed with `python -m unittest`
-**WHEN** one or more tests fail
-**THEN** the test runner prints a FAIL or ERROR result for each failing test to stdout or stderr, and exits with a non-zero exit code
+**GIVEN** the Validator tests are executed inside Docker with `docker run --rm kata-tests`
+**WHEN** one or more Validator tests fail
+**THEN** pytest prints a FAIL or ERROR result for each failing test to stdout, and the Docker container exits with a non-zero exit code
 
-### SCENARIO 2: Application exits with code 0 on successful processing
+### SCENARIO 2: CI workflow captures test results from Docker
 **Scenario ID:** VALIDATION-INFRA-001.4-S002
-**GIVEN** the CLI is invoked with a well-formed input file containing only entries that produce VALID, ERR, or ILL outcomes
-**WHEN** the Processor completes reading, parsing, validating, and writing without an unhandled exception
-**THEN** the process exits with exit code 0
+**GIVEN** the CI workflow configuration (`.github/workflows/ci.yml`)
+**WHEN** the workflow executes `docker run --rm kata-tests`
+**THEN** the workflow step captures the pytest output and fails if any tests fail, providing observability through GitHub Actions
 
-### SCENARIO 3: No event infrastructure is present in the Validator module
+### SCENARIO 3: No event infrastructure is present in the Validator module in Docker
 **Scenario ID:** VALIDATION-INFRA-001.4-S003
-**GIVEN** the Validator module source code
+**GIVEN** the Validator module source code inside the Docker container
 **WHEN** the source is inspected for imports or calls to message queues, event buses, logging frameworks, or external monitoring services
 **THEN** no such imports or calls are present; the Validator contains only checksum logic, placeholder detection, and standard-library imports
+
+### SCENARIO 4: Docker container exit code reflects test suite success
+**Scenario ID:** VALIDATION-INFRA-001.4-S004
+**GIVEN** a Docker container running the full test suite with `docker run --rm kata-tests`
+**WHEN** all tests in the suite (including Validator tests) pass
+**THEN** the container exits with exit code 0; when any test fails, it exits with a non-zero code
+
+### SCENARIO 5: Application exits with code 0 after successful validation of VALID, ERR, and ILL outcomes
+**Scenario ID:** VALIDATION-INFRA-001.4-S005
+**GIVEN** a well-formed input file containing account entries that produce VALID, ERR, and ILL outcomes after validation
+**WHEN** the BankOCR CLI application processes the file and completes validation through the Validator for all entries
+**THEN** the application process exits with exit code 0, regardless of the mix of VALID, ERR, and ILL statuses returned
 
 ---
 
@@ -337,16 +379,18 @@ BankOCR is a command-line application without a graphical frontend. All user int
 | FR-5 – Mark illegible accounts as ILL | VALIDATION-STORY-001-S003, VALIDATION-BE-001.2, VALIDATION-BE-001.2-S001, VALIDATION-BE-001.2-S002 |
 | FR-6 – Mark checksum-failing accounts as ERR | VALIDATION-STORY-001-S002, VALIDATION-BE-001.1-S002 |
 | TC-1 – Python ≥ 3.12 | VALIDATION-INFRA-001.1-S001, VALIDATION-INFRA-001.2-S003 |
-| TC-3 – Standard library only | VALIDATION-INFRA-001.1-S001, VALIDATION-INFRA-001.2-S002 |
-| TC-5 – unittest | VALIDATION-INFRA-001.1-S001, VALIDATION-INFRA-001.4-S001 |
-| ADR-001 – Single CLI, no external services | VALIDATION-INFRA-001.2-S001, VALIDATION-INFRA-001.4-S003 |
+| TC-3 – Standard library only | VALIDATION-INFRA-001.2-S002 |
+| TC-5 – unittest | Note: Docker uses pytest, not unittest (VALIDATION-INFRA-001.1) |
+| ADR-001 – Single CLI, no external services | VALIDATION-INFRA-001.4-S003 |
 | ADR-002 – File I/O confined to Processor | VALIDATION-INFRA-001.3-S001, VALIDATION-INFRA-001.3-S002, VALIDATION-INFRA-001.3-S003 |
+| Dockerfile – Local Docker environment | VALIDATION-INFRA-001.1-S001, VALIDATION-INFRA-001.1-S002, VALIDATION-INFRA-001.2-S001, VALIDATION-INFRA-001.2-S004 |
+| CI workflow – GitHub Actions | VALIDATION-INFRA-001.2-S004, VALIDATION-INFRA-001.4-S002 |
 | QS-02 – Unrecognised glyph handling | VALIDATION-STORY-001-S003, VALIDATION-BE-001.2-S001, VALIDATION-BE-001.2-S002 |
 | QS-03 – Checksum validation correctness | VALIDATION-STORY-001-S001, VALIDATION-STORY-001-S002, VALIDATION-BE-001.1-S001, VALIDATION-BE-001.1-S002, VALIDATION-BE-001.1-S003 |
-| QS-06 – Validator tested without file I/O | VALIDATION-INFRA-001.1-S002, VALIDATION-INFRA-001.1-S003, VALIDATION-INFRA-001.3-S001 |
-| QS-07 – Test suite runs with no external dependencies | VALIDATION-INFRA-001.1-S001, VALIDATION-INFRA-001.4-S001 |
+| QS-06 – Validator tested without file I/O | VALIDATION-INFRA-001.1-S003, VALIDATION-INFRA-001.1-S004, VALIDATION-INFRA-001.3-S001 |
+| QS-07 – Test suite runs with no external dependencies | VALIDATION-INFRA-001.4-S001, VALIDATION-INFRA-001.4-S002 – Note: `pytest` is a third-party test dependency, creating a discrepancy with the original QS-7 requirement for dependency-free testing |
 | QS-10 – No unjustified dependencies | VALIDATION-INFRA-001.2-S002 |
-| QS-11 – Single command invocation | VALIDATION-INFRA-001.2-S001 |
+| QS-11 – Single command invocation | VALIDATION-INFRA-001.2-S001, VALIDATION-INFRA-001.2-S005 |
 | DEBT-03 – No structured logging | VALIDATION-INFRA-001.4-S003 |
 | ch. 8.1 – Error handling and result classification | VALIDATION-STORY-001-S004, VALIDATION-BE-001.2-S003 |
 | ch. 6.3 – Runtime invariant: Validator called once per string | VALIDATION-STORY-001-S004 |
