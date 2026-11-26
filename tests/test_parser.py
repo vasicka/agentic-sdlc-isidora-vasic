@@ -165,3 +165,23 @@ def test_parsing_be_001_1_s002_given_complete_entry_with_123456789():
 
     # THEN
     assert result == "123456789"
+
+
+def test_parsing_be_001_1_s003_given_entry_with_leading_zero_preserves_leading_zeros():
+    from src.parser import parse_entry
+
+    # GIVEN
+    # A four-line entry representing account number 012345678
+    # First digit is zero (leading zero), then 12345678
+    entry = (
+        " _     _  _     _  _  _  _ ",
+        "| |  | _| _||_||_ |_   ||_|",
+        "|_|  ||_  _|  | _||_|  ||_|",
+        "",
+    )
+
+    # WHEN
+    result = parse_entry(entry)
+
+    # THEN
+    assert result == "012345678"
