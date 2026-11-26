@@ -22,3 +22,16 @@ def test_parsing_be_001_1_s001_given_one_glyph_when_recognised_then_returns_one(
 
     # THEN
     assert result == "1"
+
+
+def test_parsing_be_001_1_s001_given_two_glyph_when_recognised_then_returns_two():
+    from src.parser import recognise_digit
+
+    # GIVEN
+    glyph = (" _ ", " _|", "|_ ")
+
+    # WHEN
+    result = recognise_digit(glyph)
+
+    # THEN
+    assert result == "2"
