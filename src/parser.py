@@ -11,4 +11,6 @@ def recognise_digit(glyph):
         return "4"
     elif glyph == (" _ ", "|_ ", " _|"):
         return "5"
+    elif glyph == (" _ ", "|_ ", "|_|"):
+        return "6"
     return "0"

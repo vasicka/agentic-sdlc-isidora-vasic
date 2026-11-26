@@ -74,3 +74,16 @@ def test_parsing_be_001_1_s001_given_five_glyph_when_recognised_then_returns_fiv
 
     # THEN
     assert result == "5"
+
+
+def test_parsing_be_001_1_s001_given_six_glyph_when_recognised_then_returns_six():
+    from src.parser import recognise_digit
+
+    # GIVEN
+    glyph = (" _ ", "|_ ", "|_|")
+
+    # WHEN
+    result = recognise_digit(glyph)
+
+    # THEN
+    assert result == "6"
