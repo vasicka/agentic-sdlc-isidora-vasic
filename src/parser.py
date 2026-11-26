@@ -9,4 +9,6 @@ def recognise_digit(glyph):
         return "3"
     elif glyph == ("   ", "|_|", "  |"):
         return "4"
+    elif glyph == (" _ ", "|_ ", " _|"):
+        return "5"
     return "0"
