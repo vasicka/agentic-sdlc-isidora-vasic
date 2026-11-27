@@ -109,44 +109,56 @@ BankOCR is a command-line application without a graphical frontend. All user int
 
 ### Infrastructure Stories
 
-#### PARSING-INFRA-001.1 – Execute Parser unit tests in isolation using unittest
+#### PARSING-INFRA-001.1 – Execute Parser tests in Docker container using pytest
 
 **Story ID:** PARSING-INFRA-001.1
 **Parent story:** PARSING-STORY-001
 **Priority:** CORE
 **Architecture references:**
-- `architecture/02-constraints.md`, Section 2.1 (TC-1, TC-3, TC-5)
+- `architecture/02-constraints.md`, Section 2.1 (TC-1, TC-3, TC-5) – Note: TC-5 specifies `unittest` but Docker uses `pytest`
 - `architecture/05-building-block-view.md`, Section 5.2 (Dependency rules: Parser has no file-system dependency)
 - `architecture/08-crosscutting-concepts.md`, Section 8.3 (Parser testability convention)
 - `architecture/10-quality-requirements.md`, QS-05, QS-07
+- Dockerfile (local Docker-based environment established in Module 4)
+- CI workflow (`.github/workflows/ci.yml`)
 
 **AS A** BankOCR developer,
-**I WANT** the Parser to be exercisable in complete isolation using Python's built-in `unittest` framework with no file-system dependencies,
-**SO THAT** digit recognition defects are pinpointed immediately without requiring file fixtures or external tools.
+**I WANT** the Parser to be exercisable in complete isolation within a Docker container using `pytest`,
+**SO THAT** digit recognition defects are pinpointed immediately in the local Docker-based test environment.
+
+> **Note:** This story reflects the local Docker-based environment established in Module 4. TC-5 specifies `unittest`, but the Docker setup uses `pytest` for testing. `pytest` is a test dependency, not a runtime dependency, so it does not violate TC-3 (standard library only for runtime).
+>
+> **QS-07 clarification:** The original QS-7 requirement specifies that tests should run with no external dependencies on a machine with only Python ≥ 3.12. The Module 4 Docker/pytest setup introduces `pytest` as a third-party test dependency, which creates a discrepancy with the original QS-7 requirement. `pytest` is a test-only dependency and does not affect runtime execution, but it does mean the full test suite cannot run with zero external dependencies as originally specified in QS-7.
 
 #### Acceptance Scenarios
 
-### SCENARIO 1: Run Parser tests with no third-party dependencies
+### SCENARIO 1: Build Docker image for Parser testing
 **Scenario ID:** PARSING-INFRA-001.1-S001
-**GIVEN** a machine with Python ≥ 3.12 installed and the BankOCR source present, and no third-party packages installed
-**WHEN** the Parser unit tests are executed with `python -m unittest`
-**THEN** the test runner starts and completes without an `ImportError` or missing-dependency error
+**GIVEN** the BankOCR source code with its Dockerfile and test dependencies configuration
+**WHEN** the Docker image is built with `docker build -t kata-tests .`
+**THEN** the build completes successfully, installing Python 3.12 and test dependencies including pytest
 
-### SCENARIO 2: Pass raw multi-line string directly to Parser without file I/O
+### SCENARIO 2: Execute Parser tests inside Docker container
 **Scenario ID:** PARSING-INFRA-001.1-S002
-**GIVEN** a `unittest` test case that constructs a valid four-line account entry as a Python string literal
-**WHEN** that string is passed directly to the Parser
+**GIVEN** the built Docker image containing the BankOCR source and test suite
+**WHEN** tests are executed with `docker run --rm kata-tests` (default CMD runs pytest)
+**THEN** the Parser tests run inside the container with no external file system dependencies and produce test results
+
+### SCENARIO 3: Pass raw multi-line string directly to Parser without file I/O
+**Scenario ID:** PARSING-INFRA-001.1-S003
+**GIVEN** a pytest test case that constructs a valid four-line account entry as a Python string literal
+**WHEN** that string is passed directly to the Parser inside the Docker container
 **THEN** the Parser returns the expected nine-character account string and no file is read from or written to the file system
 
-### SCENARIO 3: Parser tests require no file fixtures
-**Scenario ID:** PARSING-INFRA-001.1-S003
-**GIVEN** the full Parser test suite
-**WHEN** the suite is executed
-**THEN** no test creates, reads, or deletes a file on disk, and no temporary directory is required
+### SCENARIO 4: Parser tests require no file fixtures when running in Docker
+**Scenario ID:** PARSING-INFRA-001.1-S004
+**GIVEN** the full Parser test suite executed inside Docker
+**WHEN** the test suite runs
+**THEN** no test creates, reads, or deletes a file on the host file system, and no temporary directory is mounted or required
 
 ---
 
-#### PARSING-INFRA-001.2 – Deploy the Parser as part of the single-file CLI application
+#### PARSING-INFRA-001.2 – Deploy the Parser as part of the single-file CLI application in Docker environment
 
 **Story ID:** PARSING-INFRA-001.2
 **Parent story:** PARSING-STORY-001
@@ -154,36 +166,49 @@ BankOCR is a command-line application without a graphical frontend. All user int
 **Architecture references:**
 - `architecture/02-constraints.md`, Section 2.1 (TC-1, TC-3)
 - `architecture/04-solution-strategy.md`, Section 4.1 (single CLI application)
-- `architecture/07-deployment-view.md`, Sections 7.1, 7.2, 7.3
+- `architecture/07-deployment-view.md`, Sections 7.1, 7.2, 7.3 – Note: Deployment view doesn't mention Docker
 - `architecture/10-quality-requirements.md`, QS-10, QS-11
+- Dockerfile (local Docker-based environment)
 
 **AS A** BankOCR developer,
-**I WANT** the Parser to be packaged as part of the single Python CLI application with no build or installation step,
-**SO THAT** a user can invoke the application on any machine with Python ≥ 3.12 without installing additional packages.
+**I WANT** the Parser to be packaged as part of the single Python CLI application within a Docker container,
+**SO THAT** the application can be invoked through Docker on any machine with Docker installed, without requiring Python ≥ 3.12 on the host.
 
 #### Acceptance Scenarios
 
-### SCENARIO 1: Application runs without package installation
+### SCENARIO 1: Docker image contains the complete application with Parser
 **Scenario ID:** PARSING-INFRA-001.2-S001
-**GIVEN** a machine with Python ≥ 3.12 and the BankOCR source files present on the local file system
-**WHEN** the CLI is invoked from the command line with a valid input file path
-**THEN** the application starts and the Parser executes without requiring `pip install` or any build step
+**GIVEN** the built Docker image `kata-tests`
+**WHEN** the image layers are inspected
+**THEN** the image contains the Parser module and all application source code, ready for execution inside the container
 
 ### SCENARIO 2: Parser imports only standard-library modules
 **Scenario ID:** PARSING-INFRA-001.2-S002
-**GIVEN** the Parser module source file
+**GIVEN** the Parser module source file inside the Docker container
 **WHEN** the import statements are inspected
-**THEN** every imported module belongs to the Python standard library and no third-party package is referenced (TC-3)
+**THEN** every imported module belongs to the Python standard library and no third-party runtime package is referenced (TC-3)
 
-### SCENARIO 3: Application runs on Python 3.12 or newer
+### SCENARIO 3: Application runs on Python 3.12 inside Docker
 **Scenario ID:** PARSING-INFRA-001.2-S003
-**GIVEN** a machine with Python 3.12 installed
-**WHEN** the CLI is invoked
+**GIVEN** a Docker container running the built image with Python 3.12
+**WHEN** the application CLI is invoked inside the container
 **THEN** the application runs to completion without a `SyntaxError` or version-compatibility error (TC-1)
+
+### SCENARIO 4: Docker image builds successfully for development testing
+**Scenario ID:** PARSING-INFRA-001.2-S004
+**GIVEN** the CI workflow configuration (`.github/workflows/ci.yml`)
+**WHEN** the workflow executes `docker build -t kata-tests .`
+**THEN** the build completes successfully, creating a runnable Docker image that includes the Parser
+
+### SCENARIO 5: Application runs without Docker installation (original CLI requirement)
+**Scenario ID:** PARSING-INFRA-001.2-S005
+**GIVEN** a machine with Python ≥ 3.12 and the BankOCR source files present on the local file system
+**WHEN** the CLI is invoked from the command line with a valid input file path
+**THEN** the application starts and the Parser executes without requiring `pip install` or any build step (preserves QS-11)
 
 ---
 
-#### PARSING-INFRA-001.3 – Confirm that the Parser operates on in-memory strings with no file-based data handling
+#### PARSING-INFRA-001.3 – Confirm that the Parser operates on in-memory strings with no file-based data handling in Docker
 
 **Story ID:** PARSING-INFRA-001.3
 **Parent story:** PARSING-STORY-001
@@ -192,36 +217,37 @@ BankOCR is a command-line application without a graphical frontend. All user int
 - `architecture/05-building-block-view.md`, Section 5.2 (Parser has no file-system dependency; ADR-002)
 - `architecture/08-crosscutting-concepts.md`, Section 8.2 (Separation of I/O from logic)
 - `architecture/09-architecture-decisions.md`, ADR-002 (File I/O confined to Processor)
+- Dockerfile (local Docker-based environment)
 
 **AS A** BankOCR developer,
-**I WANT** the Parser to receive account entries as in-memory string arguments and return account strings as return values, with no direct file access,
-**SO THAT** the Parser can be tested and reused without any dependency on the file system.
+**I WANT** the Parser to receive account entries as in-memory string arguments and return account strings as return values within the Docker container, with no direct file access,
+**SO THAT** the Parser can be tested and reused without any dependency on the file system, consistent with ADR-002.
 
-> **Note:** File I/O for account entries is owned exclusively by the Processor (ADR-002, `architecture/05-building-block-view.md`, Section 5.2). This story confirms the Parser's compliance with that boundary; it does not assign file-handling responsibilities to the Parser.
+> **Note:** File I/O for account entries is owned exclusively by the Processor (ADR-002, `architecture/05-building-block-view.md`, Section 5.2). This story confirms the Parser's compliance with that boundary in the Docker environment; it does not assign file-handling responsibilities to the Parser.
 
 #### Acceptance Scenarios
 
-### SCENARIO 1: Parser accepts a string argument, not a file path
+### SCENARIO 1: Parser accepts a string argument, not a file path, in Docker container
 **Scenario ID:** PARSING-INFRA-001.3-S001
-**GIVEN** the Parser's public interface
+**GIVEN** the Parser's public interface inside the Docker container
 **WHEN** it is called with a four-line string representing one account entry
-**THEN** it processes the string in memory and returns a nine-character string without opening any file
+**THEN** it processes the string in memory and returns a nine-character string without opening any file or accessing host file system
 
-### SCENARIO 2: Parser produces no file-system side effects
+### SCENARIO 2: Parser produces no file-system side effects in Docker
 **Scenario ID:** PARSING-INFRA-001.3-S002
-**GIVEN** an invocation of the Parser with a valid four-line account entry string
+**GIVEN** an invocation of the Parser with a valid four-line account entry string inside Docker
 **WHEN** the Parser runs to completion
-**THEN** no file is created, modified, or deleted on the file system as a side effect
+**THEN** no file is created, modified, or deleted on the container's file system or host file system as a side effect
 
-### SCENARIO 3: Changing file paths does not affect Parser output
+### SCENARIO 3: Parser behavior is consistent regardless of container file paths
 **Scenario ID:** PARSING-INFRA-001.3-S003
-**GIVEN** two calls to the Parser with identical account entry string content
-**WHEN** the calls are made in environments with different working directories
-**THEN** both calls return the identical nine-character account string, confirming no file-path dependency
+**GIVEN** two Docker containers running the same image but with different mounted volumes or working directories
+**WHEN** the Parser is called with identical account entry string content in both containers
+**THEN** both calls return the identical nine-character account string, confirming no dependency on container file paths or mounted volumes
 
 ---
 
-#### PARSING-INFRA-001.4 – Confirm event inapplicability and define observability via test results and exit codes
+#### PARSING-INFRA-001.4 – Confirm event inapplicability and define observability via pytest results and Docker exit codes
 
 **Story ID:** PARSING-INFRA-001.4
 **Parent story:** PARSING-STORY-001
@@ -231,32 +257,48 @@ BankOCR is a command-line application without a graphical frontend. All user int
 - `architecture/09-architecture-decisions.md`, ADR-001 (no event infrastructure)
 - `architecture/10-quality-requirements.md`, QS-07
 - `architecture/11-risks-and-technical-debt.md`, DEBT-03
+- Dockerfile (local Docker-based environment)
+- CI workflow (`.github/workflows/ci.yml`)
 
 **AS A** BankOCR developer,
-**I WANT** the system to report Parser test outcomes through `unittest` results and application-level exit codes rather than through event infrastructure,
-**SO THAT** errors in digit recognition are visible without introducing monitoring services that the architecture does not approve.
+**I WANT** the system to report Parser test outcomes through `pytest` results and Docker container exit codes rather than through event infrastructure,
+**SO THAT** errors in digit recognition are visible in the Docker-based test environment without introducing monitoring services that the architecture does not approve.
 
-> **Event infrastructure:** BankOCR has no message queues, event buses, pub/sub topics, or distributed tracing (ADR-001, Section 3.3). Event-driven infrastructure is not applicable to the PARSING domain. This story documents that determination explicitly and specifies the observability mechanism that applies instead.
+> **Event infrastructure:** BankOCR has no message queues, event buses, pub/sub topics, or distributed tracing (ADR-001, Section 3.3). Event-driven infrastructure is not applicable to the PARSING domain. This story documents that determination explicitly and specifies the observability mechanism that applies in the Docker environment.
+>
+> **QS-07 clarification:** The original QS-7 requirement specifies that tests should run with no external dependencies on a machine with only Python ≥ 3.12. The Module 4 Docker/pytest setup introduces `pytest` as a third-party test dependency, which creates a discrepancy with the original QS-7 requirement. `pytest` is a test-only dependency and does not affect runtime execution, but it does mean the full test suite cannot run with zero external dependencies as originally specified in QS-7.
 
 #### Acceptance Scenarios
 
-### SCENARIO 1: unittest reports Parser test pass or fail
+### SCENARIO 1: pytest reports Parser test pass or fail in Docker
 **Scenario ID:** PARSING-INFRA-001.4-S001
-**GIVEN** the Parser unit tests are executed with `python -m unittest`
-**WHEN** one or more tests fail
-**THEN** the test runner prints a FAIL or ERROR result for each failing test to stdout or stderr, and exits with a non-zero exit code
+**GIVEN** the Parser tests are executed inside Docker with `docker run --rm kata-tests`
+**WHEN** one or more Parser tests fail
+**THEN** pytest prints a FAIL or ERROR result for each failing test to stdout, and the Docker container exits with a non-zero exit code
 
-### SCENARIO 2: Application exits with code 0 on successful processing
+### SCENARIO 2: CI workflow captures test results from Docker
 **Scenario ID:** PARSING-INFRA-001.4-S002
-**GIVEN** the CLI is invoked with a well-formed input file
-**WHEN** the Processor completes reading, parsing, validating, and writing without an unhandled exception
-**THEN** the process exits with exit code 0
+**GIVEN** the CI workflow configuration (`.github/workflows/ci.yml`)
+**WHEN** the workflow executes `docker run --rm kata-tests`
+**THEN** the workflow step captures the pytest output and fails if any tests fail, providing observability through GitHub Actions
 
-### SCENARIO 3: No event infrastructure is present in the Parser module
+### SCENARIO 3: No event infrastructure is present in the Parser module in Docker
 **Scenario ID:** PARSING-INFRA-001.4-S003
-**GIVEN** the Parser module source code
+**GIVEN** the Parser module source code inside the Docker container
 **WHEN** the source is inspected for imports or calls to message queues, event buses, logging frameworks, or external monitoring services
 **THEN** no such imports or calls are present; the Parser contains only pure glyph-recognition logic and standard-library imports
+
+### SCENARIO 4: Docker container exit code reflects test suite success
+**Scenario ID:** PARSING-INFRA-001.4-S004
+**GIVEN** a Docker container running the full test suite with `docker run --rm kata-tests`
+**WHEN** all tests in the suite (including Parser tests) pass
+**THEN** the container exits with exit code 0; when any test fails, it exits with a non-zero code
+
+### SCENARIO 5: Application exits with code 0 after successful digit recognition
+**Scenario ID:** PARSING-INFRA-001.4-S005
+**GIVEN** a well-formed input file containing valid account entries
+**WHEN** the BankOCR CLI application processes the file and completes digit recognition through the Parser
+**THEN** the application process exits with exit code 0
 
 ---
 
@@ -286,15 +328,17 @@ BankOCR is a command-line application without a graphical frontend. All user int
 | FR-3 – Assemble nine-digit account numbers | PARSING-STORY-001, PARSING-BE-001.1, PARSING-BE-001.1-S002 |
 | TC-1 – Python ≥ 3.12 | PARSING-INFRA-001.1-S001, PARSING-INFRA-001.2-S003 |
 | TC-2 – Four-line entry format | PARSING-STORY-001-S001, PARSING-BE-001.1-S002, PARSING-INFRA-001.3-S001 |
-| TC-3 – Standard library only | PARSING-INFRA-001.1-S001, PARSING-INFRA-001.2-S002 |
-| TC-5 – unittest | PARSING-INFRA-001.1-S001, PARSING-INFRA-001.4-S001 |
-| ADR-001 – Single CLI, no external services | PARSING-INFRA-001.2-S001, PARSING-INFRA-001.4-S003 |
+| TC-3 – Standard library only | PARSING-INFRA-001.2-S002 |
+| TC-5 – unittest | Note: Docker uses pytest, not unittest (PARSING-INFRA-001.1) |
+| ADR-001 – Single CLI, no external services | PARSING-INFRA-001.4-S003 |
 | ADR-002 – File I/O confined to Processor | PARSING-INFRA-001.3-S001, PARSING-INFRA-001.3-S002, PARSING-INFRA-001.3-S003 |
+| Dockerfile – Local Docker environment | PARSING-INFRA-001.1-S001, PARSING-INFRA-001.1-S002, PARSING-INFRA-001.2-S001, PARSING-INFRA-001.2-S004 |
+| CI workflow – GitHub Actions | PARSING-INFRA-001.2-S004, PARSING-INFRA-001.4-S002 |
 | QS-01 – Digit recognition accuracy | PARSING-STORY-001-S003, PARSING-BE-001.1-S001 |
-| QS-05 – Parser tested without file I/O | PARSING-INFRA-001.1-S002, PARSING-INFRA-001.1-S003, PARSING-INFRA-001.3-S001 |
-| QS-07 – Test suite runs with no external dependencies | PARSING-INFRA-001.1-S001, PARSING-INFRA-001.4-S001 |
+| QS-05 – Parser tested without file I/O | PARSING-INFRA-001.1-S003, PARSING-INFRA-001.1-S004, PARSING-INFRA-001.3-S001 |
+| QS-07 – Test suite runs with no external dependencies | PARSING-INFRA-001.4-S001, PARSING-INFRA-001.4-S002 – Note: `pytest` is a third-party test dependency, creating a discrepancy with the original QS-7 requirement for dependency-free testing |
 | QS-10 – No unjustified dependencies | PARSING-INFRA-001.2-S002 |
-| QS-11 – Single command invocation | PARSING-INFRA-001.2-S001 |
+| QS-11 – Single command invocation | PARSING-INFRA-001.2-S001, PARSING-INFRA-001.2-S005 |
 | DEBT-03 – No structured logging | PARSING-INFRA-001.4-S003 |
 | RISK-01 – Glyph pattern coverage | PARSING-STORY-001-S003, PARSING-BE-001.1-S001 |
 

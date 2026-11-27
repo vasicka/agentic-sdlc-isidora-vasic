@@ -17,3 +17,6 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "N", "UP", "B", "SIM"]
+
+[tool.bandit.assert_used]
+skips = ["*_test.py", "*/test_*.py"]
